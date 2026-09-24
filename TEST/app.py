@@ -1,17 +1,17 @@
 import smtplib
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_file
 
-import Email
-from cdvToText import buildText, formatRow, processCsv
+import TEST.Email as Email
+from TEST.cdvToText import buildText, formatRow, processCsv
 
-app = Flask(__name__, static_folder="public", static_url_path="")
+app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024  # 1 MB upload limit
 
 
 @app.get("/")
 def index():
-    return send_from_directory("public", "index.html")
+    return send_file("index.html")
 
 
 @app.post("/upload")

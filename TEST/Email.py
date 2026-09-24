@@ -1,9 +1,8 @@
-import os
 import smtplib
 from email.message import EmailMessage
 
-# Set these as environment variables (locally and in Vercel), never in the code.
-gmailPassword = os.environ.get("GMAIL_APP_PASSWORD", "")
+gmailPassword = "yqvh dygo ochf gzvw"
+
 myEmail = "brianw83002@gmail.com"
 sendToAdress = "brianw83002@gmail.com"
 
@@ -11,7 +10,7 @@ sendToAdress = "brianw83002@gmail.com"
 def sendEmail(subject, body):
     if not (gmailPassword and myEmail and sendToAdress):
         raise RuntimeError(
-            "Set GMAIL_APP_PASSWORD, GMAIL_ADDRESS and SEND_TO_ADDRESS environment variables."
+            "Fill in gmailPassword, myEmail and sendToAdress at the top of Email.py."
         )
 
     msg = EmailMessage()
