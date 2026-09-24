@@ -12,7 +12,7 @@
 <body>
 <main>
   <h1>Route sorter</h1>
-  <p class="sub">Drop a route CSV. It's sorted into vans and trucks and emailed to you.</p>
+  <p class="sub">Drop a route CSV. Review the sorted routes, remove anyone you don't want, then send.</p>
 
   <label class="drop" id="drop">
     <input type="file" id="file" accept=".csv,text/csv">
@@ -25,6 +25,7 @@
   <section class="result" id="result" aria-label="Sorted routes">
     <div class="group"><h2>Vans</h2><ul id="vans"></ul></div>
     <div class="group"><h2>Truck</h2><ul id="trucks"></ul></div>
+    <button class="send" id="send" type="button">Send email</button>
   </section>
 </main>
 
@@ -33,13 +34,17 @@
   const input = document.getElementById("file");
   const statusEl = document.getElementById("status");
   const result = document.getElementById("result");
+  const sendBtn = document.getElementById("send");
+
+  let vans = [];
+  let trucks = [];
 
   function setStatus(kind, text) {
     statusEl.className = "status show " + kind;
     statusEl.textContent = text;
   }
 
-  function fillList(id, lines) {
+  function renderList(id, lines) {
     const ul = document.getElementById(id);
     ul.replaceChildren();
     if (lines.length === 0) {
@@ -49,11 +54,28 @@
       ul.appendChild(li);
       return;
     }
-    for (const line of lines) {
+    lines.forEach((line, i) => {
       const li = document.createElement("li");
-      li.textContent = line;
+      const text = document.createElement("span");
+      text.textContent = line;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "remove";
+      btn.textContent = "Remove";
+      btn.setAttribute("aria-label", "Remove " + line);
+      btn.addEventListener("click", () => {
+        lines.splice(i, 1);
+        render();
+      });
+      li.append(text, btn);
       ul.appendChild(li);
-    }
+    });
+  }
+
+  function render() {
+    renderList("vans", vans);
+    renderList("trucks", trucks);
+    sendBtn.disabled = vans.length + trucks.length === 0;
   }
 
   async function upload(file) {
@@ -63,7 +85,7 @@
       return;
     }
     result.classList.remove("show");
-    setStatus("busy", "Sorting and sending " + file.name + "…");
+    setStatus("busy", "Reading " + file.name + "…");
 
     const data = new FormData();
     data.append("file", file);
@@ -75,14 +97,39 @@
         setStatus("err", json.error || "Something went wrong.");
         return;
       }
-      fillList("vans", json.vans);
-      fillList("trucks", json.trucks);
+      vans = json.vans;
+      trucks = json.trucks;
+      render();
       result.classList.add("show");
-      setStatus("ok", "Sent to " + json.emailed_to + ".");
+      setStatus("busy", "Loaded " + file.name + ". Remove anyone you don't want, then send.");
     } catch (e) {
       setStatus("err", "Couldn't reach the server. Is Flask running?");
     }
   }
+
+  async function sendEmail() {
+    sendBtn.disabled = true;
+    setStatus("busy", "Sending…");
+    try {
+      const res = await fetch("/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vans, trucks }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setStatus("err", json.error || "Something went wrong.");
+      } else {
+        setStatus("ok", "Sent to " + json.emailed_to + ".");
+      }
+    } catch (e) {
+      setStatus("err", "Couldn't reach the server. Is Flask running?");
+    } finally {
+      sendBtn.disabled = vans.length + trucks.length === 0;
+    }
+  }
+
+  sendBtn.addEventListener("click", sendEmail);
 
   input.addEventListener("change", () => {
     upload(input.files[0]);

@@ -30,12 +30,19 @@ def formatRow(r):
     return f'{r["Name"]} Stops: {r["Stops Left"]} | {r["Stops per hour"]} per/h'
 
 
-def buildText(vans, trucks):
+def buildTextFromLines(vanLines, truckLines):
     lines = ["Vans"]
-    lines += [formatRow(r) for r in vans]
+    lines += vanLines
     lines += ["", "Truck"]
-    lines += [formatRow(r) for r in trucks]
+    lines += truckLines
     return "\n".join(lines)
+
+
+def buildText(vans, trucks):
+    return buildTextFromLines(
+        [formatRow(r) for r in vans],
+        [formatRow(r) for r in trucks],
+    )
 
 
 if __name__ == "__main__":
