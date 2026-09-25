@@ -12,76 +12,112 @@
 <body>
 <main>
   <h1>Route sorter</h1>
-  <p class="sub">Drop a route CSV. Review the sorted routes, remove anyone you don't want, then send.</p>
+  <p class="sub">Pick a format, drop the file, remove anyone you don't want, then send.</p>
+
+  <div class="formats" role="group" aria-label="File format">
+    <button type="button" class="fmt selected" id="fmt-route" data-format="route">Route sorter</button>
+    <button type="button" class="fmt" id="fmt-dcx2" data-format="dcx2">DCX2 format</button>
+    <button type="button" class="fmt" id="fmt-hlx1" data-format="hlx1">HLX1 format</button>
+  </div>
 
   <label class="drop" id="drop">
-    <input type="file" id="file" accept=".csv,text/csv">
-    <strong>Drop your CSV here</strong>
+    <input type="file" id="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+    <strong id="drop-title">Drop your CSV or XLSX here</strong>
     <span>or click to choose a file</span>
   </label>
 
   <div class="status" id="status" role="status" aria-live="polite"></div>
 
   <section class="result" id="result" aria-label="Sorted routes">
-    <div class="group"><h2>Vans</h2><ul id="vans"></ul></div>
-    <div class="group"><h2>Truck</h2><ul id="trucks"></ul></div>
+    <div id="groups"></div>
+    <input type="email" id="email" class="email-input" placeholder="Send to email address" required>
     <button class="send" id="send" type="button">Send email</button>
   </section>
 </main>
 
 <script>
   const drop = document.getElementById("drop");
+  const dropTitle = document.getElementById("drop-title");
   const input = document.getElementById("file");
   const statusEl = document.getElementById("status");
   const result = document.getElementById("result");
   const sendBtn = document.getElementById("send");
+  const emailInput = document.getElementById("email");
+  const groupsEl = document.getElementById("groups");
+  const fmtButtons = Array.from(document.querySelectorAll(".fmt"));
 
-  let vans = [];
-  let trucks = [];
+  const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+  let currentFormat = "route";
+  let groups = []; // [{ key, label, lines }]
+
+  const FORMAT_LABEL = { route: "CSV or XLSX", dcx2: "DCX2 file", hlx1: "HLX1 file" };
+
+  function selectFormat(btn) {
+    fmtButtons.forEach(b => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    currentFormat = btn.dataset.format;
+    dropTitle.textContent = "Drop your " + (FORMAT_LABEL[currentFormat] || "file") + " here";
+    result.classList.remove("show");
+    statusEl.classList.remove("show");
+  }
+
+  fmtButtons.forEach(btn => {
+    if (!btn.disabled) btn.addEventListener("click", () => selectFormat(btn));
+  });
 
   function setStatus(kind, text) {
     statusEl.className = "status show " + kind;
     statusEl.textContent = text;
   }
 
-  function renderList(id, lines) {
-    const ul = document.getElementById(id);
-    ul.replaceChildren();
-    if (lines.length === 0) {
-      const li = document.createElement("li");
-      li.className = "none";
-      li.textContent = "No routes";
-      ul.appendChild(li);
-      return;
-    }
-    lines.forEach((line, i) => {
-      const li = document.createElement("li");
-      const text = document.createElement("span");
-      text.textContent = line;
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "remove";
-      btn.textContent = "Remove";
-      btn.setAttribute("aria-label", "Remove " + line);
-      btn.addEventListener("click", () => {
-        lines.splice(i, 1);
-        render();
-      });
-      li.append(text, btn);
-      ul.appendChild(li);
-    });
-  }
-
   function render() {
-    renderList("vans", vans);
-    renderList("trucks", trucks);
-    sendBtn.disabled = vans.length + trucks.length === 0;
+    groupsEl.replaceChildren();
+    groups.forEach((group, gi) => {
+      const div = document.createElement("div");
+      div.className = "group";
+      const h2 = document.createElement("h2");
+      h2.textContent = group.label;
+      div.appendChild(h2);
+
+      const ul = document.createElement("ul");
+      if (group.lines.length === 0) {
+        const li = document.createElement("li");
+        li.className = "none";
+        li.textContent = "No routes";
+        ul.appendChild(li);
+      } else {
+        group.lines.forEach((line, li_i) => {
+          const li = document.createElement("li");
+          const text = document.createElement("span");
+          text.className = "line";
+          text.textContent = line;
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "remove";
+          btn.textContent = "Remove";
+          btn.setAttribute("aria-label", "Remove " + line);
+          btn.addEventListener("click", () => {
+            groups[gi].lines.splice(li_i, 1);
+            render();
+          });
+          li.append(text, btn);
+          ul.appendChild(li);
+        });
+      }
+      div.appendChild(ul);
+      groupsEl.appendChild(div);
+    });
+
+    const total = groups.reduce((sum, g) => sum + g.lines.length, 0);
+    sendBtn.disabled = total === 0;
   }
 
   async function upload(file) {
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      setStatus("err", "That isn't a .csv file.");
+    const n = file.name.toLowerCase();
+    if (!n.endsWith(".csv") && !n.endsWith(".xlsx")) {
+      setStatus("err", "That isn't a .csv or .xlsx file.");
       return;
     }
     result.classList.remove("show");
@@ -89,6 +125,7 @@
 
     const data = new FormData();
     data.append("file", file);
+    data.append("format", currentFormat);
 
     try {
       const res = await fetch("/upload", { method: "POST", body: data });
@@ -97,8 +134,7 @@
         setStatus("err", json.error || "Something went wrong.");
         return;
       }
-      vans = json.vans;
-      trucks = json.trucks;
+      groups = json.groups;
       render();
       result.classList.add("show");
       setStatus("busy", "Loaded " + file.name + ". Remove anyone you don't want, then send.");
@@ -108,13 +144,18 @@
   }
 
   async function sendEmail() {
+    const to = emailInput.value.trim();
+    if (!EMAIL_RE.test(to)) {
+      setStatus("err", "Enter a valid email address.");
+      return;
+    }
     sendBtn.disabled = true;
     setStatus("busy", "Sending…");
     try {
       const res = await fetch("/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vans, trucks }),
+        body: JSON.stringify({ format: currentFormat, groups, to }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -125,7 +166,7 @@
     } catch (e) {
       setStatus("err", "Couldn't reach the server. Is Flask running?");
     } finally {
-      sendBtn.disabled = vans.length + trucks.length === 0;
+      sendBtn.disabled = groups.reduce((sum, g) => sum + g.lines.length, 0) === 0;
     }
   }
 
