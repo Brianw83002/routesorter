@@ -130,6 +130,7 @@ h1 {
   margin-bottom: 8px;
 }
 .preview-head h2 { font-size: 1rem; margin: 0; }
+.preview-actions { display: flex; gap: 8px; }
 .preview pre {
   white-space: pre-wrap;
   word-break: break-word;

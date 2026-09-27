@@ -34,7 +34,10 @@
     <div class="preview" id="previewBox">
       <div class="preview-head">
         <h2>Text preview</h2>
-        <button class="copy" id="copy" type="button" disabled>Copy to clipboard</button>
+        <div class="preview-actions">
+          <button class="copy" id="copy" type="button" disabled>Copy text</button>
+          <button class="copy" id="copyImage" type="button" disabled>Copy as image</button>
+        </div>
       </div>
       <pre id="preview"></pre>
     </div>
@@ -55,6 +58,7 @@
   const groupsEl = document.getElementById("groups");
   const previewEl = document.getElementById("preview");
   const copyBtn = document.getElementById("copy");
+  const copyImageBtn = document.getElementById("copyImage");
   const fmtButtons = Array.from(document.querySelectorAll(".fmt"));
 
   const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -130,6 +134,7 @@
     sendBtn.disabled = total === 0;
     previewEl.textContent = buildPreviewText();
     copyBtn.disabled = total === 0;
+    copyImageBtn.disabled = total === 0;
   }
 
   async function upload(file) {
@@ -242,7 +247,68 @@
     document.body.removeChild(pre);
   }
 
+  function buildPreviewImage(text, scale = 2) {
+    return new Promise((resolve, reject) => {
+      const lines = text.split("\n");
+      const fontSize = 14;
+      const lineHeight = Math.round(fontSize * 1.4);
+      const padding = 16;
+      const font = fontSize + "px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+
+      const measure = document.createElement("canvas").getContext("2d");
+      measure.font = font;
+      const maxWidth = Math.max(1, ...lines.map(l => measure.measureText(l).width));
+
+      const width = Math.ceil(maxWidth) + padding * 2;
+      const height = lines.length * lineHeight + padding * 2;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width * scale;
+      canvas.height = height * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(scale, scale);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = "#1a2430";
+      ctx.font = font;
+      ctx.textBaseline = "top";
+      lines.forEach((line, i) => ctx.fillText(line, padding, padding + i * lineHeight));
+
+      canvas.toBlob(blob => {
+        if (blob) resolve(blob);
+        else reject(new Error("Couldn't render the image."));
+      }, "image/png");
+    });
+  }
+
+  async function copyPreviewImage() {
+    let blob;
+    try {
+      blob = await buildPreviewImage(buildPreviewText());
+    } catch (e) {
+      setStatus("err", "Couldn't create the image.");
+      return;
+    }
+
+    if (navigator.clipboard && window.ClipboardItem) {
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        setStatus("ok", "Copied as an image — paste it into iMessage.");
+        return;
+      } catch (e) {
+        // Some browsers support Clipboard.write() but not image types --
+        // fall through to opening it in a new tab instead.
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    setStatus("ok", "Opened the image in a new tab — save it, then share from there.");
+  }
+
   copyBtn.addEventListener("click", copyPreview);
+  copyImageBtn.addEventListener("click", copyPreviewImage);
   sendBtn.addEventListener("click", sendEmail);
 
   input.addEventListener("change", () => {
