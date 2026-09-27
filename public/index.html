@@ -26,11 +26,11 @@
     <span>or click to choose a file</span>
   </label>
 
+  <div id="groups"></div>
+
   <div class="status" id="status" role="status" aria-live="polite"></div>
 
   <section class="result" id="result" aria-label="Sorted routes">
-    <div id="groups"></div>
-
     <div class="preview" id="previewBox">
       <div class="preview-head">
         <h2>Text preview</h2>
@@ -278,6 +278,7 @@
       return;
     }
     result.classList.remove("show");
+    groupsEl.replaceChildren();
     setStatus("busy", "Reading " + file.name + "…");
 
     const data = new FormData();
@@ -434,7 +435,7 @@
     if (navigator.clipboard && window.ClipboardItem) {
       try {
         await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-        setStatus("ok", "Copied as an image — paste it into iMessage.");
+        setStatus("ok", "Copied as an image");
         return;
       } catch (e) {
         // Some browsers support Clipboard.write() but not image types --

@@ -59,6 +59,7 @@ h1 {
 
 .result { margin-top: 20px; display: none; }
 .result.show { display: block; }
+#groups:not(:empty) { margin-top: 20px; }
 .group {
   background: var(--panel);
   border: 1px solid var(--line);
