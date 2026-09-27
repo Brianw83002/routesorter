@@ -75,6 +75,7 @@
     dropTitle.textContent = "Drop your " + (FORMAT_LABEL[currentFormat] || "file") + " here";
     result.classList.remove("show");
     statusEl.classList.remove("show");
+    editing = null;
   }
 
   fmtButtons.forEach(btn => {
@@ -90,6 +91,51 @@
     return groups
       .map(g => [g.label, ...g.lines].join("\n"))
       .join("\n\n");
+  }
+
+  let editing = null; // { gi, li } of the line currently being edited, or null
+
+  // Matches NAME_COLUMN_WIDTH in cdvToText.py, used for DCX2/HLX1 lines
+  // (the ones with a "|" separator).
+  const PIPE_NAME_WIDTH = 15;
+  const MAX_LINE_LENGTH = 200; // matches app.py's MAX_LINE_LENGTH
+
+  function splitLine(line) {
+    const pipeIndex = line.indexOf("|");
+    if (pipeIndex !== -1) {
+      return {
+        name: line.slice(0, pipeIndex).trim(),
+        sep: "|",
+        stats: line.slice(pipeIndex + 1).trim(),
+      };
+    }
+    // Route-sorter lines have no "|" -- split right before the stats, which
+    // always start with a number.
+    const m = line.match(/^(.*?)\s+(-?\d.*)$/);
+    if (m) return { name: m[1].trim(), sep: "", stats: m[2].trim() };
+    return { name: line.trim(), sep: "", stats: "" };
+  }
+
+  function joinLine(name, sep, stats) {
+    name = name.trim();
+    stats = stats.trim();
+    const joined =
+      sep === "|"
+        ? name.slice(0, PIPE_NAME_WIDTH).padEnd(PIPE_NAME_WIDTH) + "| " + stats
+        : (stats ? `${name} ${stats}` : name);
+    return joined.slice(0, MAX_LINE_LENGTH);
+  }
+
+  function commitEditIfAny() {
+    if (!editing) return;
+    const nameInput = groupsEl.querySelector(".line-edit-name");
+    const statsInput = groupsEl.querySelector(".line-edit-stats");
+    if (nameInput) {
+      const sep = nameInput.dataset.sep;
+      const value = joinLine(nameInput.value, sep, statsInput ? statsInput.value : "");
+      if (value) groups[editing.gi].lines[editing.li] = value;
+    }
+    editing = null;
   }
 
   function render() {
@@ -110,19 +156,106 @@
       } else {
         group.lines.forEach((line, li_i) => {
           const li = document.createElement("li");
+
+          if (editing && editing.gi === gi && editing.li === li_i) {
+            const { name, sep, stats } = splitLine(line);
+
+            const editRow = document.createElement("div");
+            editRow.className = "line-edit-row";
+
+            const nameInput = document.createElement("input");
+            nameInput.type = "text";
+            nameInput.className = "line-edit line-edit-name";
+            nameInput.maxLength = 60;
+            nameInput.value = name;
+            nameInput.dataset.sep = sep;
+            nameInput.setAttribute("aria-label", "Name");
+            editRow.appendChild(nameInput);
+
+            if (sep) {
+              const sepEl = document.createElement("span");
+              sepEl.className = "line-sep";
+              sepEl.textContent = sep;
+              sepEl.setAttribute("aria-hidden", "true");
+              editRow.appendChild(sepEl);
+            }
+
+            const statsInput = document.createElement("input");
+            statsInput.type = "text";
+            statsInput.className = "line-edit line-edit-stats";
+            statsInput.maxLength = 140;
+            statsInput.value = stats;
+            statsInput.setAttribute("aria-label", "Stops and pace");
+            editRow.appendChild(statsInput);
+
+            const actions = document.createElement("div");
+            actions.className = "line-actions";
+
+            const saveBtn = document.createElement("button");
+            saveBtn.type = "button";
+            saveBtn.className = "save";
+            saveBtn.textContent = "Save";
+            saveBtn.addEventListener("click", () => {
+              const value = joinLine(nameInput.value, sep, statsInput.value);
+              if (value) groups[gi].lines[li_i] = value;
+              editing = null;
+              render();
+            });
+
+            const cancelBtn = document.createElement("button");
+            cancelBtn.type = "button";
+            cancelBtn.className = "cancel";
+            cancelBtn.textContent = "Cancel";
+            cancelBtn.addEventListener("click", () => {
+              editing = null;
+              render();
+            });
+
+            [nameInput, statsInput].forEach(el => {
+              el.addEventListener("keydown", e => {
+                if (e.key === "Enter") { e.preventDefault(); saveBtn.click(); }
+                else if (e.key === "Escape") { e.preventDefault(); cancelBtn.click(); }
+              });
+            });
+
+            actions.append(saveBtn, cancelBtn);
+            li.append(editRow, actions);
+            ul.appendChild(li);
+            requestAnimationFrame(() => { nameInput.focus(); nameInput.select(); });
+            return;
+          }
+
           const text = document.createElement("span");
           text.className = "line";
           text.textContent = line;
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "remove";
-          btn.textContent = "Remove";
-          btn.setAttribute("aria-label", "Remove " + line);
-          btn.addEventListener("click", () => {
+
+          const actions = document.createElement("div");
+          actions.className = "line-actions";
+
+          const editBtn = document.createElement("button");
+          editBtn.type = "button";
+          editBtn.className = "edit";
+          editBtn.textContent = "Edit";
+          editBtn.setAttribute("aria-label", "Edit " + line);
+          editBtn.addEventListener("click", () => {
+            commitEditIfAny();
+            editing = { gi, li: li_i };
+            render();
+          });
+
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "remove";
+          removeBtn.textContent = "Remove";
+          removeBtn.setAttribute("aria-label", "Remove " + line);
+          removeBtn.addEventListener("click", () => {
+            commitEditIfAny();
             groups[gi].lines.splice(li_i, 1);
             render();
           });
-          li.append(text, btn);
+
+          actions.append(editBtn, removeBtn);
+          li.append(text, actions);
           ul.appendChild(li);
         });
       }
@@ -159,15 +292,18 @@
         return;
       }
       groups = json.groups;
+      editing = null;
       render();
       result.classList.add("show");
-      setStatus("busy", "Loaded " + file.name + ". Remove anyone you don't want, then send.");
+      setStatus("busy", "Loaded " + file.name + ". Edit or remove anyone you don't want, then send.");
     } catch (e) {
       setStatus("err", "Couldn't reach the server. Is Flask running?");
     }
   }
 
   async function sendEmail() {
+    commitEditIfAny();
+    render();
     const to = emailInput.value.trim();
     if (!EMAIL_RE.test(to)) {
       setStatus("err", "Enter a valid email address.");
@@ -206,6 +342,8 @@
   }
 
   async function copyPreview() {
+    commitEditIfAny();
+    render();
     const text = buildPreviewText();
 
     if (navigator.clipboard && window.ClipboardItem) {
@@ -283,6 +421,8 @@
   }
 
   async function copyPreviewImage() {
+    commitEditIfAny();
+    render();
     let blob;
     try {
       blob = await buildPreviewImage(buildPreviewText());

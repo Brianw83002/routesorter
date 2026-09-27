@@ -87,6 +87,81 @@ h1 {
   gap: 12px;
 }
 
+.line-actions { display: flex; gap: 8px; flex: none; }
+
+.line-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.line-sep {
+  flex: none;
+  font-family: ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: .9rem;
+  color: var(--muted);
+}
+.line-edit-name { flex: 0 1 40%; }
+.line-edit-stats { flex: 1 1 auto; }
+
+.edit {
+  flex: none;
+  font: inherit;
+  font-size: .85rem;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.edit:hover { background: var(--accent-soft); border-color: var(--accent); }
+.edit:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.line-edit {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-family: ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: .9rem;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink);
+}
+.line-edit:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.save {
+  flex: none;
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.save:hover { background: #0b5555; }
+.save:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.cancel {
+  flex: none;
+  font: inherit;
+  font-size: .85rem;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.cancel:hover { background: var(--bg); }
+.cancel:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
 .remove {
   flex: none;
   font: inherit;
