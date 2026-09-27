@@ -30,6 +30,15 @@
 
   <section class="result" id="result" aria-label="Sorted routes">
     <div id="groups"></div>
+
+    <div class="preview" id="previewBox">
+      <div class="preview-head">
+        <h2>Text preview</h2>
+        <button class="copy" id="copy" type="button" disabled>Copy to clipboard</button>
+      </div>
+      <pre id="preview"></pre>
+    </div>
+
     <input type="email" id="email" class="email-input" placeholder="Send to email address" required>
     <button class="send" id="send" type="button">Send email</button>
   </section>
@@ -44,6 +53,8 @@
   const sendBtn = document.getElementById("send");
   const emailInput = document.getElementById("email");
   const groupsEl = document.getElementById("groups");
+  const previewEl = document.getElementById("preview");
+  const copyBtn = document.getElementById("copy");
   const fmtButtons = Array.from(document.querySelectorAll(".fmt"));
 
   const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -69,6 +80,12 @@
   function setStatus(kind, text) {
     statusEl.className = "status show " + kind;
     statusEl.textContent = text;
+  }
+
+  function buildPreviewText() {
+    return groups
+      .map(g => [g.label, ...g.lines].join("\n"))
+      .join("\n\n");
   }
 
   function render() {
@@ -111,6 +128,8 @@
 
     const total = groups.reduce((sum, g) => sum + g.lines.length, 0);
     sendBtn.disabled = total === 0;
+    previewEl.textContent = buildPreviewText();
+    copyBtn.disabled = total === 0;
   }
 
   async function upload(file) {
@@ -170,6 +189,30 @@
     }
   }
 
+  async function copyPreview() {
+    const text = buildPreviewText();
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus("ok", "Copied to clipboard.");
+    } catch (e) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try {
+        document.execCommand("copy");
+        setStatus("ok", "Copied to clipboard.");
+      } catch (e2) {
+        setStatus("err", "Couldn't copy. Select the text manually.");
+      }
+      document.body.removeChild(ta);
+    }
+  }
+
+  copyBtn.addEventListener("click", copyPreview);
   sendBtn.addEventListener("click", sendEmail);
 
   input.addEventListener("change", () => {

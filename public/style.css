@@ -115,6 +115,47 @@ h1 {
 .send:hover:not(:disabled) { background: #0b5555; }
 .send:disabled { background: var(--line); color: var(--muted); cursor: not-allowed; }
 
+.preview {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.preview-head h2 { font-size: 1rem; margin: 0; }
+.preview pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: .9rem;
+  margin: 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.copy {
+  flex: none;
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.copy:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); }
+.copy:disabled { color: var(--muted); cursor: not-allowed; opacity: .6; }
+.copy:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
 .email-input {
   display: block;
   width: 100%;

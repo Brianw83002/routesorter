@@ -1,5 +1,6 @@
 import csv
 import io
+import re
 
 # --- Route sorter format (Vans/Truck split by CP/XL in Route Code) ---
 
@@ -111,31 +112,66 @@ def buildDcx2Text(vanLines, header="Vans"):
 
 # --- HLX1 format (route report export; split into 5 sections by Delivery Service Type) ---
 
-HLX1_REQUIRED = ["Driver name", "Delivery Service Type", "not started stops", "cortex_avg_pace_stops_per_hour"]
+HLX1_REQUIRED = ["Driver name", "Delivery Service Type", "App sign in:", "not started stops", "cortex_avg_pace_stops_per_hour"]
 
-# Display order for the 5 sections, and which "Delivery Service Type" value goes in each.
-HLX1_SECTIONS = ["MA", "UB", "Trucks", "Vans", "Backup"]
+# Display order for the 6 sections, and which "Delivery Service Type" value goes in each.
+# Trucks are further split into waves below, based on "App sign in".
+HLX1_SECTIONS = ["MA", "UB", "Trucks 1st wave", "Trucks 2nd wave", "Vans", "Backup"]
 
 HLX1_SERVICE_TYPE_BY_SECTION = {
     "UB": "AMXL UDS Commingle",
     "MA": "AMXL MA UDS Commingle",
-    "Trucks": "AMXL Box Truck (Medium) w/ Helper",
     "Vans": "AMXL Custom Delivery Van 14ft Single DA",
     "Backup": "DSP Initiated Work (Standard Vehicle)",
 }
 
+TRUCK_SERVICE_TYPE = "AMXL Box Truck (Medium) w/ Helper"
+TRUCK_2ND_WAVE_CUTOFF_MINUTES = 8 * 60 + 30  # 8:30 AM
+
+_TIME_RE = re.compile(r"(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?")
+
+
+def _signInMinutes(value):
+    """Parse the 'App sign in' value into minutes since midnight, or None if
+    it can't be parsed. Handles a bare time ('8:15', '08:15 AM') as well as
+    a time with a date in front of it ('1/15/2025 8:15 AM')."""
+    if not value:
+        return None
+    m = _TIME_RE.search(str(value))
+    if not m:
+        return None
+    hour = int(m.group(1))
+    minute = int(m.group(2))
+    ampm = m.group(3)
+    if ampm:
+        ampm = ampm.upper()
+        if ampm == "PM" and hour != 12:
+            hour += 12
+        elif ampm == "AM" and hour == 12:
+            hour = 0
+    return hour * 60 + minute
+
 
 def hlx1RowsToGroups(rows):
-    """Split rows into MA / UB / Trucks / Vans / Backup by Delivery Service Type.
-    Rows with a Delivery Service Type that doesn't match any of the 5 known
-    values are dropped."""
+    """Split rows into MA / UB / Trucks 1st wave / Trucks 2nd wave / Vans /
+    Backup by Delivery Service Type. Trucks with an "App sign in" at or after
+    8:30 AM are 2nd wave; all other trucks (including ones where the sign-in
+    time can't be read) are 1st wave. Rows with a Delivery Service Type that
+    doesn't match any of the known values are dropped."""
     groups = {section: [] for section in HLX1_SECTIONS}
     sectionByType = {v: k for k, v in HLX1_SERVICE_TYPE_BY_SECTION.items()}
     for row in rows:
         serviceType = (row.get("Delivery Service Type") or "").strip()
-        section = sectionByType.get(serviceType)
-        if section:
-            groups[section].append(row)
+        if serviceType == TRUCK_SERVICE_TYPE:
+            minutes = _signInMinutes(row.get("App sign in:"))
+            if minutes is not None and minutes >= TRUCK_2ND_WAVE_CUTOFF_MINUTES:
+                groups["Trucks 2nd wave"].append(row)
+            else:
+                groups["Trucks 1st wave"].append(row)
+        else:
+            section = sectionByType.get(serviceType)
+            if section:
+                groups[section].append(row)
     return groups
 
 
