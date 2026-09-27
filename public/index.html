@@ -189,27 +189,57 @@
     }
   }
 
+  function previewHtml(text) {
+    const escaped = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    return (
+      '<pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; '
+      + 'font-size: 14px; white-space: pre;">' + escaped + "</pre>"
+    );
+  }
+
   async function copyPreview() {
     const text = buildPreviewText();
-    try {
-      await navigator.clipboard.writeText(text);
-      setStatus("ok", "Copied to clipboard.");
-    } catch (e) {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
+
+    if (navigator.clipboard && window.ClipboardItem) {
       try {
-        document.execCommand("copy");
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/plain": new Blob([text], { type: "text/plain" }),
+            "text/html": new Blob([previewHtml(text)], { type: "text/html" }),
+          }),
+        ]);
         setStatus("ok", "Copied to clipboard.");
-      } catch (e2) {
-        setStatus("err", "Couldn't copy. Select the text manually.");
+        return;
+      } catch (e) {
+        // Some browsers support Clipboard.write() but reject one of the
+        // types above -- fall through to the DOM-selection fallback.
       }
-      document.body.removeChild(ta);
     }
+
+    // Fallback: select a hidden monospace block and let execCommand("copy")
+    // grab it as rich text, so columns still line up where they land.
+    const pre = document.createElement("pre");
+    pre.textContent = text;
+    pre.style.cssText =
+      "position:fixed; top:0; left:0; opacity:0; white-space:pre; " +
+      "font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;";
+    document.body.appendChild(pre);
+    const range = document.createRange();
+    range.selectNodeContents(pre);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    try {
+      document.execCommand("copy");
+      setStatus("ok", "Copied to clipboard.");
+    } catch (e2) {
+      setStatus("err", "Couldn't copy. Select the text manually.");
+    }
+    sel.removeAllRanges();
+    document.body.removeChild(pre);
   }
 
   copyBtn.addEventListener("click", copyPreview);
