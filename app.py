@@ -1,4 +1,5 @@
 import smtplib
+import io
 
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -47,7 +48,7 @@ def _readRows(file, required, formatLabel):
             raise ValueError("Couldn't read the file. Save it as UTF-8 CSV.")
         return readCsvRows(text, required, formatLabel)
     elif name.endswith(".xlsx"):
-        return readXlsxRows(file.stream, required, formatLabel)
+        return readXlsxRows(io.BytesIO(file.read()), required, formatLabel)
     else:
         raise ValueError("That isn't a .csv or .xlsx file.")
 

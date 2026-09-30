@@ -125,7 +125,10 @@ HLX1_SERVICE_TYPE_BY_SECTION = {
     "Backup": "DSP Initiated Work (Standard Vehicle)",
 }
 
-TRUCK_SERVICE_TYPE = "AMXL Box Truck (Medium) w/ Helper"
+TRUCK_SERVICE_TYPE = {
+    "AMXL Box Truck (Medium) w/ Helper",
+    "AMXL Box Truck (Large) w/ Helper",
+}
 TRUCK_2ND_WAVE_CUTOFF_MINUTES = 8 * 60 + 30  # 8:30 AM
 
 _TIME_RE = re.compile(r"(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?")
@@ -162,7 +165,7 @@ def hlx1RowsToGroups(rows):
     sectionByType = {v: k for k, v in HLX1_SERVICE_TYPE_BY_SECTION.items()}
     for row in rows:
         serviceType = (row.get("Delivery Service Type") or "").strip()
-        if serviceType == TRUCK_SERVICE_TYPE:
+        if serviceType in TRUCK_SERVICE_TYPE:
             minutes = _signInMinutes(row.get("App sign in:"))
             if minutes is not None and minutes >= TRUCK_2ND_WAVE_CUTOFF_MINUTES:
                 groups["Trucks 2nd wave"].append(row)
